@@ -1,0 +1,178 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  AUCTIONEER
+  BIDDER
+}
+
+/// Estado persistido do lote. "Agendado", "ao vivo" e "aguardando liquidação"
+/// são fases derivadas de startsAt/endsAt enquanto o lote está ACTIVE.
+enum LotStatus {
+  ACTIVE
+  CANCELLED
+  SETTLED
+}
+
+enum LedgerType {
+  DEPOSIT
+  PURCHASE
+  SALE
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  password     String
+  role         Role
+  /// Saldo total em centavos. O comprometido é derivado dos lotes ativos que o usuário lidera.
+  balanceCents Int      @default(0) @map("balance_cents")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  lotsSold   Lot[]         @relation("SellerLots")
+  lotsLeader Lot[]         @relation("LeaderLots")
+  lotsWon    Lot[]         @relation("WinnerLots")
+  bids       Bid[]
+  ledger     LedgerEntry[]
+  receipts   Receipt[]
+
+  @@map("users")
+}
+
+/// Cópia local (snapshot) do item da API externa. Depois de criado o lote,
+/// nada mais depende da API: metadados e imagem ficam no nosso banco.
+model Item {
+  id          String   @id @default(uuid())
+  source      String
+  externalId  String   @map("external_id")
+  title       String
+  artist      String?
+  dateDisplay String?  @map("date_display")
+  medium      String?
+  dimensions  String?
+  origin      String?
+  attributes  Json     @default("{}")
+  imageUrl    String?  @map("image_url")
+  imageData   Bytes?   @map("image_data")
+  imageMime   String?  @map("image_mime")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  lots Lot[]
+
+  @@index([source, externalId])
+  @@map("items")
+}
+
+model Lot {
+  id                String    @id @default(uuid())
+  sellerId          String    @map("seller_id")
+  itemId            String    @map("item_id")
+  title             String
+  description       String?
+  startingBidCents  Int       @map("starting_bid_cents")
+  minIncrementCents Int       @map("min_increment_cents")
+  startsAt          DateTime  @map("starts_at")
+  /// Fim atual (pode ser prorrogado pelo anti-sniping).
+  endsAt            DateTime  @map("ends_at")
+  originalEndsAt    DateTime  @map("original_ends_at")
+  status            LotStatus @default(ACTIVE)
+  currentBidCents   Int?      @map("current_bid_cents")
+  leaderId          String?   @map("leader_id")
+  bidCount          Int       @default(0) @map("bid_count")
+  extensionCount    Int       @default(0) @map("extension_count")
+
+  /// Cadeia de hashes: genesisHash ancora os parâmetros do lote, headHash é o último elo.
+  genesisHash   String @map("genesis_hash")
+  headHash      String @map("head_hash")
+  /// Assinatura Ed25519 do selo do lote (contagem de lances, cabeça da cadeia, status, resultado).
+  sealSignature String @map("seal_signature")
+
+  winnerId        String?   @map("winner_id")
+  winnerAlias     String?   @map("winner_alias")
+  finalPriceCents Int?      @map("final_price_cents")
+  cancelledAt     DateTime? @map("cancelled_at")
+  settledAt       DateTime? @map("settled_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  seller  User     @relation("SellerLots", fields: [sellerId], references: [id])
+  leader  User?    @relation("LeaderLots", fields: [leaderId], references: [id])
+  winner  User?    @relation("WinnerLots", fields: [winnerId], references: [id])
+  item    Item     @relation(fields: [itemId], references: [id])
+  bids    Bid[]
+  receipt Receipt?
+
+  @@index([status, startsAt])
+  @@index([status, endsAt])
+  @@index([leaderId, status])
+  @@index([sellerId])
+  @@map("lots")
+}
+
+model Bid {
+  id          String   @id @default(uuid())
+  lotId       String   @map("lot_id")
+  bidderId    String   @map("bidder_id")
+  /// Posição do lance na cadeia do lote (1, 2, 3...).
+  seq         Int
+  amountCents Int      @map("amount_cents")
+  /// Pseudônimo do licitante neste lote (HMAC de lote+usuário). Nunca expõe dados pessoais.
+  bidderAlias String   @map("bidder_alias")
+  placedAt    DateTime @map("placed_at")
+  prevHash    String   @map("prev_hash")
+  hash        String
+  signature   String
+
+  lot    Lot  @relation(fields: [lotId], references: [id])
+  bidder User @relation(fields: [bidderId], references: [id])
+
+  @@unique([lotId, seq])
+  @@index([bidderId])
+  @@map("bids")
+}
+
+/// Extrato da carteira: cada movimentação do saldo total fica registrada.
+model LedgerEntry {
+  id                String     @id @default(uuid())
+  userId            String     @map("user_id")
+  type              LedgerType
+  /// Positivo = crédito, negativo = débito.
+  amountCents       Int        @map("amount_cents")
+  balanceAfterCents Int        @map("balance_after_cents")
+  lotId             String?    @map("lot_id")
+  createdAt         DateTime   @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@map("ledger_entries")
+}
+
+/// Comprovante de arremate. O id é um token aleatório usado no link público.
+model Receipt {
+  id          String   @id
+  lotId       String   @unique @map("lot_id")
+  winnerId    String   @map("winner_id")
+  winnerAlias String   @map("winner_alias")
+  amountCents Int      @map("amount_cents")
+  /// Cabeça da cadeia de lances no momento do encerramento.
+  headHash    String   @map("head_hash")
+  /// Texto canônico exato que foi assinado.
+  payload     String
+  signature   String
+  issuedAt    DateTime @map("issued_at")
+
+  lot    Lot  @relation(fields: [lotId], references: [id])
+  winner User @relation(fields: [winnerId], references: [id])
+
+  @@map("receipts")
+}

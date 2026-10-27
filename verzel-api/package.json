@@ -1,0 +1,56 @@
+{
+	"name": "verzel-api",
+	"version": "1.0.0",
+	"description": "API da Casa de Leilões online (teste técnico Elite Dev - Verzel)",
+	"main": "dist/server.js",
+	"scripts": {
+		"dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+		"build": "prisma generate && tsc",
+		"start": "node dist/server.js",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run",
+		"lint": "biome check src",
+		"db:local": "tsx scripts/local-db.mts",
+		"db:migrate": "prisma migrate deploy",
+		"db:migrate:dev": "prisma migrate dev",
+		"db:seed": "tsx src/scripts/seed.ts",
+		"db:seed:prod": "node dist/scripts/seed.js",
+		"db:reset": "prisma migrate reset --force --skip-seed && tsx src/scripts/seed.ts",
+		"keygen": "tsx src/scripts/keygen.ts"
+	},
+	"keywords": [],
+	"author": "Angelo Luiz Giroletto",
+	"license": "ISC",
+	"type": "commonjs",
+	"dependencies": {
+		"@prisma/client": "^6.19.3",
+		"bcryptjs": "^3.0.3",
+		"cors": "^2.8.6",
+		"dotenv": "^17.3.1",
+		"express": "^5.2.1",
+		"express-rate-limit": "^8.1.0",
+		"helmet": "^8.1.0",
+		"jsonwebtoken": "^9.0.3",
+		"prisma": "^6.19.3",
+		"socket.io": "^4.8.1"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.6",
+		"@types/cors": "^2.8.19",
+		"@types/express": "^5.0.6",
+		"@types/jsonwebtoken": "^9.0.10",
+		"@types/node": "^24.12.2",
+		"embedded-postgres": "17.9.0-beta.16",
+		"ts-node-dev": "^2.0.0",
+		"tsx": "^4.20.5",
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.4"
+	},
+	"allowScripts": {
+		"esbuild@0.28.2": true,
+		"prisma@6.19.3": true,
+		"@prisma/client@6.19.3": true,
+		"@prisma/engines@6.19.3": true,
+		"@embedded-postgres/windows-x64@17.9.0-beta.17": true
+	}
+}
