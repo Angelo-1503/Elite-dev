@@ -16,13 +16,25 @@ function secret(name: string, devFallback: string): string {
 	return devFallback;
 }
 
+/**
+ * Origens liberadas no CORS (HTTP e Socket.IO). "*" libera qualquer origem; numa
+ * lista o "*" seria comparado como texto, então ele vira `true` aqui. A barra final
+ * é removida porque o navegador envia a origem sem ela.
+ */
+function parseCorsOrigins(value: string): true | string[] {
+	const origins = value
+		.split(",")
+		.map((origin) => origin.trim().replace(/\/+$/, ""))
+		.filter(Boolean);
+	return origins.includes("*") ? true : origins;
+}
+
 export const env = {
 	isProduction,
 	port: Number(process.env.PORT) || 3000,
-	corsOrigins: (process.env.CORS_ORIGIN ?? "http://localhost:5173")
-		.split(",")
-		.map((origin) => origin.trim())
-		.filter(Boolean),
+	corsOrigins: parseCorsOrigins(
+		process.env.CORS_ORIGIN ?? "http://localhost:5173",
+	),
 	jwtSecret: secret("JWT_SECRET", "dev-jwt-secret"),
 	aliasSecret: secret("ALIAS_SECRET", "dev-alias-secret"),
 	signingKeySeed: secret(
