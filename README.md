@@ -2,8 +2,10 @@
 
 Teste técnico **Elite Dev · Verzel**. Plataforma de leilões de obras de arte com lances ao vivo, carteira simulada, comprovante de arremate compartilhável e **histórico de lances auditável e à prova de adulteração**.
 
-- **Aplicação (deploy):** _preencher com a URL da Vercel_
-- **API (deploy):** _preencher com a URL do Render_
+- **Aplicação (deploy):** https://elite-dev-dusky.vercel.app
+- **API (deploy):** https://elite-dev-yv16.onrender.com/api (health check: [`/api/health`](https://elite-dev-yv16.onrender.com/api/health))
+
+> A API está no plano gratuito do Render, que "dorme" após 15 min sem uso. O primeiro acesso pode levar cerca de 50 segundos.
 - **Itens leiloados:** acervo público do [Art Institute of Chicago](https://api.artic.edu/docs/) (API aberta, sem chave)
 
 ---
