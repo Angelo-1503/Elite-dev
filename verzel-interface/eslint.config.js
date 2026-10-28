@@ -18,5 +18,12 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // Contexts exportam o Provider e o hook de acesso no mesmo arquivo.
+      'react-refresh/only-export-components': [
+        'error',
+        { allowExportNames: ['useAuth', 'useTheme', 'useWallet', 'inputClass'] },
+      ],
+    },
   },
 ])

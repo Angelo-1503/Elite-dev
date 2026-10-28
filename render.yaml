@@ -1,0 +1,34 @@
+# Blueprint do Render: API (Node) + PostgreSQL.
+# O front vai para a Vercel (pasta verzel-interface). Depois do primeiro deploy,
+# preencha CORS_ORIGIN com a URL da Vercel.
+databases:
+  - name: verzel-leiloes-db
+    plan: free
+    databaseName: verzel_leiloes
+
+services:
+  - type: web
+    name: verzel-leiloes-api
+    runtime: node
+    plan: free
+    rootDir: verzel-api
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npx prisma migrate deploy && npm run db:seed:prod && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: verzel-leiloes-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALIAS_SECRET
+        generateValue: true
+      - key: SIGNING_KEY_SEED
+        generateValue: true
+      - key: CORS_ORIGIN
+        sync: false
+      - key: AIC_USER_AGENT
+        value: verzel-leiloes (teste tecnico Elite Dev)
